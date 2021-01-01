@@ -1,66 +1,104 @@
 const express = require("express");
 const bodyParser = require("body-parser");
 const https = require("https");
-const { json } = require("body-parser");
 const app = express();
 require('dotenv').config();
 
 
 app.use(bodyParser.urlencoded({extended:true}));
+console.log("1")
 
 app.get("/", (req,res) =>{
   res.sendFile(__dirname + "/index.html");
 });
 
+//formから送られてきたデータに対する処理
 app.post("/", (req,res) => {
+  console.log("2");
 
-  let searchWord = req.body.search;
+  let searchWord = req.body.search.toLowerCase(); 
   const apiKey = process.env.API_KEY;
-  const url = "https://bestapi-ted-v1.p.rapidapi.com/transcriptFreeText?size=1&text=" + searchWord + "&rapidapi-key="+ apiKey;
+  let TedUrl = "https://bestapi-ted-v1.p.rapidapi.com/transcriptFreeText?size=1&text=" + searchWord + "&rapidapi-key="+ apiKey;
 
+//tedURlからvideoIdを取得　そしてそのidからサムネイルを描画
+    let request = https.request(TedUrl, function (response) {
+      console.log("3")
 
-  https.get(url, (response) => {
-
-    let req = https.request(url, function (response) {
       let chunks = [];
-    
+      
       response.on("data", function (chunk) {
-        console.log(chunk);
+        console.log("4");
+
+        // console.log(chunk);
         chunks.push(chunk);
       });
     
       response.on("end", function () {
-        var body = Buffer.concat(chunks);
-        console.log(body);
+        console.log("5");
 
-        const jsonFormat = JSON.parse(body);
-        console.log(jsonFormat[0].youTubeID);
+        let body = Buffer.concat(chunks);
 
-        let youTubeID = jsonFormat[0].youTubeID;
+        const jsonFormatData = JSON.parse(body);
+        let youTubeID = jsonFormatData[0].youTubeID;
 
-        let imgUrl = "https://img.youtube.com/vi/" + youTubeID + "/hqdefault.jpg";
+         let imgUrl = "https://img.youtube.com/vi/" + youTubeID + "/hqdefault.jpg";
+         
+         let subtitleUrl = "https://subtitles-for-youtube.p.rapidapi.com/subtitles/" + youTubeID + "?translated=None&type=None&lang=en&rapidapi-key="+ apiKey
+         
 
+        //  上で取得したvideoIdから字幕を取得　かつ、検索ワードから該当の字幕箇所を取り出し描画 TedUrlがendまで行ってからここの処理を走るように
+        //  https.get(subtitleUrl, (response) => {
+       
+           let req2 = https.get(subtitleUrl, function (res2) {
+            console.log("6");
 
+             let chunks2 = [];
+           
+             res2.on("data", function (chunk2) {
+               chunks2.push(chunk2);
+             });
+           
+             res2.on("end", function () {
+              console.log("7");
 
-        res.send("<img src=" + imgUrl + ">")
-        
+               let body2 = Buffer.concat(chunks2);
+       
+               const SubtitleData = JSON.parse(body2);
+               console.log("8");
+
+              
+       
+               const subtitleWord = SubtitleData.filter((element) => {
+                 return element.text.includes(searchWord) === true;
+               });
+               console.log("--------------Target here----------------");
+       
+               console.log(subtitleWord);
+
+              //  res2.write(subtitleWord[0].text);
+              res.write("<h1>" + subtitleWord[0].text + "</h1>");
+              res.write("<img src=" + imgUrl + "/>");
+               res.send();
+             });
+           });
+           
+           req2.end();
+         
+        // res.send()
       });
     });
     
-    req.end();
+    request.end();
 
 
 
-    // let stockData = ''; // Initialize an empty variable for the data
- 
-    // response.on("data", function(data){
-    //   stockData += data; // this function gets called about 4 times.
-    // });
- 
-    
-  })
+
+  // })
 });
 
 app.listen(3000, () => {
-  console.log("server is running on port 3000");
+  console.log("server is running on port 3002");
 });
+
+
+// react + node + 
